@@ -187,7 +187,7 @@ class DatastoreEncoder(json.JSONEncoder):
 
 def delete_datastore_resource(resource_id, api_key, ckan_url):
     try:
-        delete_url = get_url('datastore_delete', ckan_url)
+        delete_url = get_url('datastore_delete', CKAN_URL)
         response = requests.post(delete_url,
                                  verify=SSL_VERIFY,
                                  data=json.dumps({'id': resource_id,
@@ -203,7 +203,7 @@ def delete_datastore_resource(resource_id, api_key, ckan_url):
 
 def datastore_resource_exists(resource_id, api_key, ckan_url):
     try:
-        search_url = get_url('datastore_search', ckan_url)
+        search_url = get_url('datastore_search', CKAN_URL)
         response = requests.post(search_url,
                                  verify=SSL_VERIFY,
                                  params={'id': resource_id,
@@ -235,7 +235,7 @@ def send_resource_to_datastore(resource, headers, records, api_key, ckan_url):
                'records': records}
 
     name = resource.get('name')
-    url = get_url('datastore_create', ckan_url)
+    url = get_url('datastore_create', CKAN_URL)
     r = requests.post(url,
                       verify=SSL_VERIFY,
                       data=json.dumps(request, cls=DatastoreEncoder),
@@ -252,7 +252,7 @@ def update_resource(resource, api_key, ckan_url):
 
     resource['url_type'] = 'datapusher'
 
-    url = get_url('resource_update', ckan_url)
+    url = get_url('resource_update', CKAN_URL)
     r = requests.post(
         url,
         verify=SSL_VERIFY,
@@ -268,7 +268,7 @@ def get_resource(resource_id, ckan_url, api_key):
     """
     Gets available information about the resource from CKAN
     """
-    url = get_url('resource_show', ckan_url)
+    url = get_url('resource_show', CKAN_URL)
     r = requests.post(url,
                       verify=SSL_VERIFY,
                       data=json.dumps({'id': resource_id}),
@@ -323,19 +323,19 @@ def push_to_datastore(task_id, input, dry_run=False):
     api_key = input.get('api_key')
 
     try:
-        resource = get_resource(resource_id, ckan_url, api_key)
+        resource = get_resource(resource_id, CKAN_URL, api_key)
     except util.JobError, e:
         #try again in 5 seconds just incase CKAN is slow at adding resource
         time.sleep(5)
-        resource = get_resource(resource_id, ckan_url, api_key)
-        
+        resource = get_resource(resource_id, CKAN_URL, api_key)
+
     # check if the resource url_type is a datastore
     if resource.get('url_type') == 'datastore':
         logger.info('Dump files are managed with the Datastore API')
         return
 
     # check scheme
-    url = resource.get('url')
+    url = resource.get('url').replace(ckan_url, CKAN_URL+'/')
     scheme = urlparse.urlsplit(url).scheme
     if scheme not in ('http', 'https', 'ftp'):
         raise util.JobError(
@@ -414,7 +414,7 @@ def push_to_datastore(task_id, input, dry_run=False):
     row_set = table_set.tables.pop()
     offset, headers = messytables.headers_guess(row_set.sample)
 
-    existing = datastore_resource_exists(resource_id, api_key, ckan_url)
+    existing = datastore_resource_exists(resource_id, api_key, CKAN_URL)
     existing_info = None
     if existing:
         existing_info = dict((f['id'], f['info'])
@@ -460,7 +460,7 @@ def push_to_datastore(task_id, input, dry_run=False):
     if existing:
         logger.info('Deleting "{res_id}" from datastore.'.format(
             res_id=resource_id))
-        delete_datastore_resource(resource_id, api_key, ckan_url)
+        delete_datastore_resource(resource_id, api_key, CKAN_URL)
 
     headers_dicts = [dict(id=field[0], type=TYPE_MAPPING[str(field[1])])
                      for field in zip(headers, types)]
@@ -486,10 +486,10 @@ def push_to_datastore(task_id, input, dry_run=False):
         count += len(records)
         logger.info('Saving chunk {number}'.format(number=i))
         send_resource_to_datastore(resource, headers_dicts,
-                                   records, api_key, ckan_url)
+                                   records, api_key, CKAN_URL)
 
     logger.info('Successfully pushed {n} entries to "{res_id}".'.format(
         n=count, res_id=resource_id))
 
     if data.get('set_url_type', False):
-        update_resource(resource, api_key, ckan_url)
+        update_resource(resource, api_key, CKAN_URL)
