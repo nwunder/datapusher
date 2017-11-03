@@ -336,7 +336,7 @@ def push_to_datastore(task_id, input, dry_run=False):
         return
 
     # check scheme
-    url = resource.get('url').replace(ckan_url, CKAN_URL+'/')
+    url = resource.get('url') #.replace(ckan_url, CKAN_URL+'/')
     scheme = urlparse.urlsplit(url).scheme
     if scheme not in ('http', 'https', 'ftp'):
         raise util.JobError(
